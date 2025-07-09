@@ -46,22 +46,33 @@ namespace FillMyCart
 
         static void Postfix(SalesItem __instance)
         {
-            TextMeshProUGUI productAmountText = AccessTools.Field(typeof(SalesItem), "m_ProductAmountText").GetValue(__instance) as TextMeshProUGUI;
-            if (productAmountText == null)
+            if (!ConfigManager.Instance.EnableMinimumProductAmountTextInput.Value)
+                return;
+
+            TextMeshProUGUI inventoryProductAmountText = AccessTools.Field(typeof(SalesItem), "m_InventoryProductAmountText").GetValue(__instance) as TextMeshProUGUI;
+            if (inventoryProductAmountText == null)
             {
-                Plugin.GetLogger().LogError("Couldn't access the m_ProductAmountText field of SalesItem instance");
+                Plugin.GetLogger().LogError("Couldn't access the m_InventoryProductAmountText field of SalesItem instance");
                 return;
             }
 
-            GameObject autoFillInput = new GameObject("AutoFillInput");
-            autoFillInput.transform.SetParent(productAmountText.transform.parent, false);
-            TextMeshProUGUI tmp = autoFillInput.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = productAmountText.fontSize;
-            tmp.font = productAmountText.font;
-            tmp.color = productAmountText.color;
-            tmp.alignment = productAmountText.alignment;
+            GameObject obj = inventoryProductAmountText.transform.parent.gameObject;
+            GameObject autoFillInput = Object.Instantiate(obj, obj.transform.parent);
+            autoFillInput.GetComponent<RectTransform>().anchoredPosition = new Vector2(49.5053f, 9.3384f);
+            autoFillInput.name = "AutoFillInput";
 
-            TMP_InputField inputField = autoFillInput.AddComponent<TMP_InputField>();
+            // Replace TMP_Text with TMP_InputField
+            TMP_Text storeAmountText = autoFillInput.GetComponentInChildren<TMP_Text>();
+            GameObject textGO = storeAmountText.gameObject;
+            Object.DestroyImmediate(storeAmountText); // Remove the old text component
+
+            TextMeshProUGUI tmp = textGO.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = inventoryProductAmountText.fontSize;
+            tmp.font = inventoryProductAmountText.font;
+            tmp.color = inventoryProductAmountText.color;
+            tmp.alignment = inventoryProductAmountText.alignment;
+
+            TMP_InputField inputField = textGO.AddComponent<TMP_InputField>();
             inputField.textComponent = tmp;
             inputField.text = $"{ConfigManager.Instance.GetProductMinimumQuantity(__instance.ProductID)}";
             inputField.contentType = TMP_InputField.ContentType.IntegerNumber;
@@ -80,41 +91,43 @@ namespace FillMyCart
                 ConfigManager.Instance.SetProductMinimumQuantity(__instance.ProductID, int.Parse(sanitized));
             });
 
-            RectTransform sourceRect = productAmountText.GetComponent<RectTransform>();
-            RectTransform inputRect = autoFillInput.GetComponent<RectTransform>();
-            inputRect.anchorMin = sourceRect.anchorMin;
-            inputRect.anchorMax = sourceRect.anchorMax;
-            inputRect.pivot = sourceRect.pivot;
-            inputRect.sizeDelta = sourceRect.sizeDelta;
-            inputRect.anchoredPosition = sourceRect.anchoredPosition + new Vector2(0, 30);
+            // Update sprite icon
+            textGO.transform.parent.GetComponent<Image>().sprite = GetIconSprite();
 
-            GameObject background = new GameObject("Background");
-            background.transform.SetParent(autoFillInput.transform, false);
+            // Setup text input transparent background
+            GameObject textInputBackground = new GameObject("Background");
+            textInputBackground.transform.SetParent(textGO.transform, false);
 
-            Image backgroundImage = background.AddComponent<Image>();
-            backgroundImage.color = new Color(0, 0, 0, 0.3f);
+            Image textInputBackgroundImage = textInputBackground.AddComponent<Image>();
+            textInputBackgroundImage.color = new Color(0, 0, 0, 0.3f);
 
-            RectTransform backgroundRect = background.GetComponent<RectTransform>();
-            backgroundRect.anchorMin = Vector2.zero;
-            backgroundRect.anchorMax = Vector2.one;
-            backgroundRect.offsetMin = Vector2.zero;
-            backgroundRect.offsetMax = Vector2.zero;
+            RectTransform textInputBackgroundRect = textInputBackground.GetComponent<RectTransform>();
+            textInputBackgroundRect.anchorMin = Vector2.zero;
+            textInputBackgroundRect.anchorMax = Vector2.one;
+            textInputBackgroundRect.offsetMin = Vector2.zero;
+            textInputBackgroundRect.offsetMax = Vector2.zero;
 
-            inputField.targetGraphic = backgroundImage;
+            inputField.targetGraphic = textInputBackgroundImage;
 
-            GameObject icon = new GameObject("AutoFillIcon");
-            icon.transform.SetParent(autoFillInput.transform.parent, false);
+            RectTransform textRect = textGO.GetComponent<RectTransform>();
+            textRect.offsetMin += Vector2.left * 10.0f;
 
-            Image iconImage = icon.AddComponent<Image>();
-            iconImage.sprite = GetIconSprite();
-            iconImage.SetNativeSize();
+            // Setup text input opaque background (used to hide MoreDetailedComputerInventory UI)
+            GameObject opaqueBackground = new GameObject("OpaqueBackground");
+            opaqueBackground.transform.SetParent(autoFillInput.transform.parent.transform, false);
 
-            RectTransform iconRect = icon.GetComponent<RectTransform>();
-            iconRect.anchorMin = inputRect.anchorMin;
-            iconRect.anchorMax = inputRect.anchorMax;
-            iconRect.pivot = inputRect.pivot;
-            iconRect.sizeDelta = new Vector2(0.01f, 0.01f);
-            iconRect.anchoredPosition = new Vector2(0, 31);
+            Image opaqueBackgroundImage = opaqueBackground.AddComponent<Image>();
+            opaqueBackgroundImage.color = new Color(28.0f / 255.0f, 56.0f / 255.0f, 70.0f / 255.0f, 1.0f); // match with the original background color
+
+            RectTransform opaqueBackgroundRect = opaqueBackground.GetComponent<RectTransform>();
+            opaqueBackgroundRect.anchorMin = new Vector2(0.498f, 0.516f);
+            opaqueBackgroundRect.anchorMax = new Vector2(0.788f, 0.856f);
+            opaqueBackgroundRect.offsetMin = Vector2.zero;
+            opaqueBackgroundRect.offsetMax = Vector2.zero;
+
+            Plugin.Instance.AddTogglableGameObject(opaqueBackground);
+            Plugin.Instance.AddTogglableGameObject(autoFillInput);
+            autoFillInput.transform.SetAsLastSibling();
         }
     }
 }

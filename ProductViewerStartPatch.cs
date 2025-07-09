@@ -12,6 +12,9 @@ namespace FillMyCart
 
         static void Postfix(ProductViewer __instance)
         {
+            if (!ConfigManager.Instance.EnableAutoFillButton.Value)
+                return;
+
             TMP_Dropdown productTypeDropdown = AccessTools.Field(typeof(ProductViewer), "m_ProductTypeDropdown").GetValue(__instance) as TMP_Dropdown;
             if (productTypeDropdown == null)
             {
@@ -50,6 +53,8 @@ namespace FillMyCart
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
+
+            Plugin.Instance.AddTogglableGameObject(autoFillButton);
         }
     }
 }

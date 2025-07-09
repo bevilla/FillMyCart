@@ -21,6 +21,8 @@ namespace FillMyCart
             return Instance.Logger;
         }
 
+        private List<GameObject> m_togglableGameObjects = new List<GameObject>();
+
         void Awake()
         {
             Instance = this;
@@ -37,6 +39,18 @@ namespace FillMyCart
             {
                 AutoFill();
                 Singleton<CartManager>.Instance.MarketShoppingCart.Purchase(false);
+            }
+
+            if (ConfigManager.Instance.ToggleUIHotkey.Value.MainKey != KeyCode.None)
+            {
+                if (ConfigManager.Instance.ToggleUIHotkey.Value.IsDown())
+                {
+                    foreach (GameObject go in m_togglableGameObjects)
+                    {
+                        go.SetActive(!go.activeSelf);
+                        go.transform.SetAsLastSibling();
+                    }
+                }
             }
         }
 
@@ -62,6 +76,14 @@ namespace FillMyCart
                     Singleton<CartManager>.Instance.AddCart(itemQuantity, SalesType.PRODUCT);
                 }
             }
+        }
+
+        public void AddTogglableGameObject(GameObject go)
+        {
+            m_togglableGameObjects.Add(go);
+            if (ConfigManager.Instance.ToggleUIHotkey.Value.MainKey == KeyCode.None)
+                return;
+            go.SetActive(false);
         }
     }
 }
