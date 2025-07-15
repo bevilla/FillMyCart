@@ -12,7 +12,7 @@ namespace FillMyCart
     {
         public const string PLUGIN_GUID = "FillMyCart";
         public const string PLUGIN_NAME = "FillMyCart";
-        public const string PLUGIN_VERSION = "1.1.0";
+        public const string PLUGIN_VERSION = "1.1.1";
 
         public static Plugin Instance = null;
 
