@@ -38,7 +38,10 @@ namespace FillMyCart
             if (ConfigManager.Instance.AutoPurchaseHotkey.Value.MainKey != KeyCode.None && ConfigManager.Instance.AutoPurchaseHotkey.Value.IsDown())
             {
                 AutoFill();
-                Singleton<CartManager>.Instance.MarketShoppingCart.Purchase(false);
+                if (Singleton<CartManager>.Instance.MarketShoppingCart.GetHasMoneyForPurchase())
+                {
+                    Singleton<CartManager>.Instance.MarketShoppingCart.Purchase(false);
+                }
             }
 
             if (ConfigManager.Instance.ToggleUIHotkey.Value.MainKey != KeyCode.None)
