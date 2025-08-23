@@ -84,7 +84,7 @@
     <Compile Include="SalesItemStartPatch.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="AutoFillInputIcon.png" />
+    <EmbeddedResource Include="AutoFillMinimumInputIcon.png" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="AutoFillThresholdInputIcon.png" />

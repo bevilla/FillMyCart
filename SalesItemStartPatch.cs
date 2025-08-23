@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using HarmonyLib;
 using System.Linq;
 using System.Reflection;
@@ -12,12 +13,12 @@ namespace FillMyCart
     [HarmonyPatch(typeof(SalesItem), "Start")]
     class SalesItemStartPatch
     {
-        static Sprite iconSprite = null;
+        static readonly IDictionary<string, Sprite> iconSprites = new Dictionary<string, Sprite>();
 
         static Sprite GetIconSprite(string fileName)
         {
-            if (iconSprite != null)
-                return iconSprite;
+            if (iconSprites.TryGetValue(fileName, out var sprite))
+                return sprite;
 
             var resourceName = Assembly.GetExecutingAssembly().GetManifestResourceNames().Single(str => str.EndsWith(fileName));
 
@@ -34,7 +35,7 @@ namespace FillMyCart
 
                 var texture = new Texture2D(2, 2);
                 texture.LoadImage(data);
-                iconSprite = Sprite.Create(
+                iconSprites[fileName] = Sprite.Create(
                     texture,
                     new Rect(0, 0, texture.width, texture.height),
                     new Vector2(0.5f, 0.5f),
@@ -42,7 +43,7 @@ namespace FillMyCart
                 );
             }
 
-            return iconSprite;
+            return iconSprites[fileName];
         }
 
         static void Postfix(SalesItem __instance)
@@ -64,7 +65,7 @@ namespace FillMyCart
                 template,
                 new Vector2(49.5053f, 9.3384f),
                 "AutoFillMinimumInput",
-                GetIconSprite("AutoFillInputIcon.png"),
+                GetIconSprite("AutoFillMinimumInputIcon.png"),
                 $"{ConfigManager.Instance.GetProductMinimumQuantity(__instance.ProductID)}",
                 sanitized => ConfigManager.Instance.SetProductMinimumQuantity(__instance.ProductID, int.Parse(sanitized))
             );
