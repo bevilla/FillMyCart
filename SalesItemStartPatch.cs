@@ -1,10 +1,11 @@
-﻿using HarmonyLib;
-using System.IO;
+﻿using System;
+using HarmonyLib;
 using System.Linq;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace FillMyCart
 {
@@ -13,14 +14,14 @@ namespace FillMyCart
     {
         static Sprite iconSprite = null;
 
-        static Sprite GetIconSprite()
+        static Sprite GetIconSprite(string fileName)
         {
             if (iconSprite != null)
                 return iconSprite;
 
-            string resourceName = Assembly.GetExecutingAssembly().GetManifestResourceNames().Single(str => str.EndsWith("AutoFillInputIcon.png"));
+            var resourceName = Assembly.GetExecutingAssembly().GetManifestResourceNames().Single(str => str.EndsWith(fileName));
 
-            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
+            using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
             {
                 if (stream == null)
                 {
@@ -28,10 +29,10 @@ namespace FillMyCart
                     return null;
                 }
 
-                byte[] data = new byte[stream.Length];
+                var data = new byte[stream.Length];
                 stream.Read(data, 0, data.Length);
 
-                Texture2D texture = new Texture2D(2, 2);
+                var texture = new Texture2D(2, 2);
                 texture.LoadImage(data);
                 iconSprite = Sprite.Create(
                     texture,
@@ -49,85 +50,115 @@ namespace FillMyCart
             if (!ConfigManager.Instance.EnableMinimumProductAmountTextInput.Value)
                 return;
 
-            TextMeshProUGUI inventoryProductAmountText = AccessTools.Field(typeof(SalesItem), "m_InventoryProductAmountText").GetValue(__instance) as TextMeshProUGUI;
+            var inventoryProductAmountText = AccessTools.Field(typeof(SalesItem), "m_InventoryProductAmountText").GetValue(__instance) as TextMeshProUGUI;
             if (inventoryProductAmountText == null)
             {
                 Plugin.GetLogger().LogError("Couldn't access the m_InventoryProductAmountText field of SalesItem instance");
                 return;
             }
+            
+            var template = inventoryProductAmountText.transform.parent.gameObject;
 
-            GameObject obj = inventoryProductAmountText.transform.parent.gameObject;
-            GameObject autoFillInput = Object.Instantiate(obj, obj.transform.parent);
-            autoFillInput.GetComponent<RectTransform>().anchoredPosition = new Vector2(49.5053f, 9.3384f);
-            autoFillInput.name = "AutoFillInput";
+            // minimum
+            var minimum = CreateInput(
+                template,
+                new Vector2(49.5053f, 9.3384f),
+                "AutoFillMinimumInput",
+                GetIconSprite("AutoFillInputIcon.png"),
+                $"{ConfigManager.Instance.GetProductMinimumQuantity(__instance.ProductID)}",
+                sanitized => ConfigManager.Instance.SetProductMinimumQuantity(__instance.ProductID, int.Parse(sanitized))
+            );
 
-            // Replace TMP_Text with TMP_InputField
-            TMP_Text storeAmountText = autoFillInput.GetComponentInChildren<TMP_Text>();
-            GameObject textGO = storeAmountText.gameObject;
-            Object.DestroyImmediate(storeAmountText); // Remove the old text component
-
-            TextMeshProUGUI tmp = textGO.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = inventoryProductAmountText.fontSize;
-            tmp.font = inventoryProductAmountText.font;
-            tmp.color = inventoryProductAmountText.color;
-            tmp.alignment = inventoryProductAmountText.alignment;
-
-            TMP_InputField inputField = textGO.AddComponent<TMP_InputField>();
-            inputField.textComponent = tmp;
-            inputField.text = $"{ConfigManager.Instance.GetProductMinimumQuantity(__instance.ProductID)}";
-            inputField.contentType = TMP_InputField.ContentType.IntegerNumber;
-            inputField.onValueChanged.AddListener(value =>
-            {
-                string sanitized = new string(value.Where(char.IsDigit).ToArray());
-
-                if (sanitized.Length == 0)
-                {
-                    sanitized = "0";
-                }
-                if (sanitized != value)
-                {
-                    inputField.SetTextWithoutNotify(sanitized);
-                }
-                ConfigManager.Instance.SetProductMinimumQuantity(__instance.ProductID, int.Parse(sanitized));
-            });
-
-            // Update sprite icon
-            textGO.transform.parent.GetComponent<Image>().sprite = GetIconSprite();
-
-            // Setup text input transparent background
-            GameObject textInputBackground = new GameObject("Background");
-            textInputBackground.transform.SetParent(textGO.transform, false);
-
-            Image textInputBackgroundImage = textInputBackground.AddComponent<Image>();
-            textInputBackgroundImage.color = new Color(0, 0, 0, 0.3f);
-
-            RectTransform textInputBackgroundRect = textInputBackground.GetComponent<RectTransform>();
-            textInputBackgroundRect.anchorMin = Vector2.zero;
-            textInputBackgroundRect.anchorMax = Vector2.one;
-            textInputBackgroundRect.offsetMin = Vector2.zero;
-            textInputBackgroundRect.offsetMax = Vector2.zero;
-
-            inputField.targetGraphic = textInputBackgroundImage;
-
-            RectTransform textRect = textGO.GetComponent<RectTransform>();
-            textRect.offsetMin += Vector2.left * 10.0f;
-
+            // threshold
+            var threshold = CreateInput(
+                template,
+                new Vector2(49.5053f, 9.3384f * 2f + 7f),
+                "AutoFillThresholdInput",
+                GetIconSprite("AutoFillThresholdInputIcon.png"),
+                $"{ConfigManager.Instance.GetProductThresholdQuantity(__instance.ProductID)}",
+                sanitized => ConfigManager.Instance.SetProductThresholdQuantity(__instance.ProductID, int.Parse(sanitized))
+            );
+            
             // Setup text input opaque background (used to hide MoreDetailedComputerInventory UI)
-            GameObject opaqueBackground = new GameObject("OpaqueBackground");
-            opaqueBackground.transform.SetParent(autoFillInput.transform.parent.transform, false);
+            var opaqueBackground = new GameObject("OpaqueBackground");
+            opaqueBackground.transform.SetParent(minimum.transform.parent.transform, false);
 
-            Image opaqueBackgroundImage = opaqueBackground.AddComponent<Image>();
+            var opaqueBackgroundImage = opaqueBackground.AddComponent<Image>();
             opaqueBackgroundImage.color = new Color(28.0f / 255.0f, 56.0f / 255.0f, 70.0f / 255.0f, 1.0f); // match with the original background color
 
-            RectTransform opaqueBackgroundRect = opaqueBackground.GetComponent<RectTransform>();
+            var opaqueBackgroundRect = opaqueBackground.GetComponent<RectTransform>();
             opaqueBackgroundRect.anchorMin = new Vector2(0.498f, 0.516f);
             opaqueBackgroundRect.anchorMax = new Vector2(0.788f, 0.856f);
             opaqueBackgroundRect.offsetMin = Vector2.zero;
             opaqueBackgroundRect.offsetMax = Vector2.zero;
-
             Plugin.Instance.AddTogglableGameObject(opaqueBackground);
-            Plugin.Instance.AddTogglableGameObject(autoFillInput);
-            autoFillInput.transform.SetAsLastSibling();
+
+            // display inputs
+            Plugin.Instance.AddTogglableGameObject(minimum);
+            Plugin.Instance.AddTogglableGameObject(threshold);
+            minimum.transform.SetAsLastSibling();
+            threshold.transform.SetAsLastSibling();
+        }
+        
+        private static GameObject CreateInput(GameObject template, Vector2 anchoredPos, string name,
+            Sprite icon, string initialText, Action<string> onChange)
+        {
+            var clone = Object.Instantiate(template, template.transform.parent);
+            var rect = clone.GetComponent<RectTransform>();
+            rect.anchoredPosition = anchoredPos;
+            clone.name = name;
+
+            // find text object
+            var oldTmp = clone.GetComponentInChildren<TMP_Text>();
+            var textGO = oldTmp.gameObject;
+
+            // replace TMP_Text by TMP_InputField
+            Object.DestroyImmediate(oldTmp);
+
+            var tmp = textGO.AddComponent<TextMeshProUGUI>();
+            var refTmp = template.GetComponentInChildren<TextMeshProUGUI>();
+            tmp.fontSize = refTmp.fontSize;
+            tmp.font = refTmp.font;
+            tmp.color = refTmp.color;
+            tmp.alignment = refTmp.alignment;
+            tmp.enableWordWrapping = false;
+            tmp.raycastTarget = true;
+
+            var inputField = textGO.AddComponent<TMP_InputField>();
+            inputField.textComponent = tmp;
+            inputField.text = initialText;
+            inputField.contentType = TMP_InputField.ContentType.IntegerNumber;
+
+            inputField.onValueChanged.AddListener(value =>
+            {
+                var sanitized = new string(value.Where(char.IsDigit).ToArray());
+                if (sanitized.Length == 0) sanitized = "0";
+                if (sanitized != value) inputField.SetTextWithoutNotify(sanitized);
+                onChange?.Invoke(sanitized);
+            });
+
+            // icon
+            textGO.transform.parent.GetComponent<Image>().sprite = icon;
+
+            // backgrounnd style
+            var bg = new GameObject("Background");
+            bg.transform.SetParent(textGO.transform, false);
+
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = new Color(0, 0, 0, 0.3f);
+
+            var bgRect = bg.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+
+            inputField.targetGraphic = bgImg;
+
+            var textRect = textGO.GetComponent<RectTransform>();
+            textRect.offsetMin += Vector2.left * 10f; // padding
+
+            return clone;
         }
     }
 }

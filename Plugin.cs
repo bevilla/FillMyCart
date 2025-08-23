@@ -48,7 +48,7 @@ namespace FillMyCart
             {
                 if (ConfigManager.Instance.ToggleUIHotkey.Value.IsDown())
                 {
-                    foreach (GameObject go in m_togglableGameObjects)
+                    foreach (var go in m_togglableGameObjects)
                     {
                         go.SetActive(!go.activeSelf);
                         go.transform.SetAsLastSibling();
@@ -59,23 +59,29 @@ namespace FillMyCart
 
         public static void AutoFill()
         {
-            List<ProductSO> products = Singleton<IDManager>.Instance.Products.ToList();
+            var products = Singleton<IDManager>.Instance.Products.ToList();
             products.RemoveAll(product => !Singleton<ProductLicenseManager>.Instance.IsProductLicenseUnlocked(product.ID));
 
             foreach (var product in products)
             {
-                int productInCartIndex = Singleton<CartManager>.Instance.CartData.ProductInCarts.FindIndex(itemQuantity => itemQuantity.FirstItemID == product.ID);
-                int productMinimumQuantity = ConfigManager.Instance.GetProductMinimumQuantity(product.ID);
-                int productPerBox = product.GridLayoutInBox.productCount;
-                int productCount = Singleton<InventoryManager>.Instance.GetInventoryAmount(product.ID) + (productInCartIndex < 0 ? 0 : (Singleton<CartManager>.Instance.CartData.ProductInCarts[productInCartIndex].FirstItemCount * productPerBox));
-                int numberOfBoxesToBuy = (int)Mathf.Ceil((productMinimumQuantity - productCount) / (float)productPerBox);
+                var productInCartIndex = Singleton<CartManager>.Instance.CartData.ProductInCarts.FindIndex(itemQuantity => itemQuantity.FirstItemID == product.ID);
+                var productMinimumQuantity = ConfigManager.Instance.GetProductMinimumQuantity(product.ID);
+                var productPerBox = product.GridLayoutInBox.productCount;
+                var productCount = Singleton<InventoryManager>.Instance.GetInventoryAmount(product.ID) + (productInCartIndex < 0 ? 0 : (Singleton<CartManager>.Instance.CartData.ProductInCarts[productInCartIndex].FirstItemCount * productPerBox));
+                var numberOfBoxesToBuy = (int)Mathf.Ceil((productMinimumQuantity - productCount) / (float)productPerBox);
+                var threshold = ConfigManager.Instance.GetProductThresholdQuantity(product.ID);
 
-                for (int i = 0; i < numberOfBoxesToBuy; ++i)
+                if (threshold > 0 && productCount >= threshold)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < numberOfBoxesToBuy; ++i)
                 {
                     if (Singleton<CartManager>.Instance.MarketShoppingCart.CartMaxed(willBeAddedMore: true))
                         break;
-                    float price = Singleton<PriceManager>.Instance.SellingPrice(product.ID);
-                    ItemQuantity itemQuantity = new ItemQuantity(product.ID, price);
+                    var price = Singleton<PriceManager>.Instance.SellingPrice(product.ID);
+                    var itemQuantity = new ItemQuantity(product.ID, price);
                     Singleton<CartManager>.Instance.AddCart(itemQuantity, SalesType.PRODUCT);
                 }
             }
