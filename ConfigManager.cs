@@ -9,17 +9,7 @@ namespace FillMyCart
     {
         private static ConfigManager _instance;
 
-        public static ConfigManager Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    _instance = new ConfigManager();
-                }
-                return _instance;
-            }
-        }
+        public static ConfigManager Instance => _instance ??= new ConfigManager();
 
         // 1. Settings
         public ConfigEntry<bool> Enable { get; set; }
@@ -30,7 +20,8 @@ namespace FillMyCart
         public ConfigEntry<KeyboardShortcut> AutoPurchaseHotkey { get; set; }
         public ConfigEntry<KeyboardShortcut> ToggleUIHotkey { get; set; }
 
-        private Dictionary<int, ConfigEntry<int>> m_minimumProductCountEntries = new Dictionary<int, ConfigEntry<int>>();
+        private readonly Dictionary<int, ConfigEntry<int>> m_minimumProductCountEntries = new Dictionary<int, ConfigEntry<int>>();
+        private readonly Dictionary<int, ConfigEntry<int>> m_thresholdProductCountEntries = new Dictionary<int, ConfigEntry<int>>();
 
         public ConfigManager()
         {
@@ -48,12 +39,13 @@ namespace FillMyCart
 
         private void LazyInitMinimumProductCount()
         {
-            if (m_minimumProductCountEntries.Count > 0)
+            if (m_minimumProductCountEntries.Count == Singleton<IDManager>.Instance.Products.Count)
                 return;
 
             foreach (var product in Singleton<IDManager>.Instance.Products)
             {
                 m_minimumProductCountEntries[product.ID] = Plugin.Instance.Config.Bind("MinimumProductCount", $"Product_{product.ID}", 0, $"{product.ProductName} ({product.ProductBrand})");
+                m_thresholdProductCountEntries[product.ID] = Plugin.Instance.Config.Bind("ThresholdProductCount", $"Product_{product.ID}", 0, $"{product.ProductName} ({product.ProductBrand})");
             }
         }
 
@@ -63,10 +55,22 @@ namespace FillMyCart
             return m_minimumProductCountEntries[productId].Value;
         }
 
+        public int GetProductThresholdQuantity(int productId)
+        {
+            LazyInitMinimumProductCount();
+            return m_thresholdProductCountEntries[productId].Value;
+        }
+
         public void SetProductMinimumQuantity(int productId, int value)
         {
             LazyInitMinimumProductCount();
             m_minimumProductCountEntries[productId].Value = value;
+        }
+
+        public void SetProductThresholdQuantity(int productId, int value)
+        {
+            LazyInitMinimumProductCount();
+            m_thresholdProductCountEntries[productId].Value = value;
         }
     }
 }
